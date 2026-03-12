@@ -1,0 +1,17 @@
+{
+  "name": "cesconix-plugins",
+  "metadata": {
+    "description": "Claude Code plugins by cesconix",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "development",
+      "description": "Autonomous development agent that picks tasks from a project board, explores the codebase, implements the solution, opens a PR, and notifies the team. Configurable per-project via project files.",
+      "source": "./plugins/development",
+      "skills": [
+        "./skills/delivering-tickets"
+      ]
+    }
+  ]
+}
