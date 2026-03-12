@@ -36,9 +36,13 @@ High level, no jargon. Focus on impact, scope, and decisions. Example:
 
 ## How to Reach People
 
-Use the channel specified in their contact entry (`slack`, `teams`, or `prompt`). Send your question via the appropriate MCP tool.
+Use the channel specified in their contact entry:
 
-After sending a question, **stop and tell the user** what you asked and to whom. Example:
+- **slack** — send a direct message via the Slack MCP tool
+- **teams** — send a message via the Teams MCP tool
+- **prompt** — don't send anything externally. Instead, show the question directly to the user in the conversation and let them relay it manually (useful for contacts without Slack/Teams, or when the user prefers to be the intermediary)
+
+After sending a question (or presenting it for `prompt` contacts), **stop and tell the user** what you asked and to whom. Example:
 > "I asked Alice on Slack which error handling pattern to use. Say 'check' or use `/delivering-tickets:check` when you want me to look for a reply, or paste the answer directly if you already have it."
 
 The agent does NOT poll automatically. It waits for the user to:

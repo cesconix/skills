@@ -22,8 +22,8 @@ repositories:
 # ============================================================
 # Board / Task Management
 # ============================================================
+# The MCP tool to use is defined in mcp_tools.board below — no need to repeat it here.
 board:
-  tool: jira                                # jira | clickup | github
   project_key: "ALPHA"                      # Project identifier on the board
   statuses:                                 # Optional: map workflow statuses
     todo: "To Do"
@@ -60,8 +60,8 @@ contacts:
 # ============================================================
 # Notifications
 # ============================================================
+# The MCP tool to use is defined in mcp_tools.notifications below — no need to repeat it here.
 notifications:
-  tool: slack                               # slack | teams
   channel: "#alpha-dev"                     # Where to post updates (PR opened, task done, etc.)
 
 # ============================================================

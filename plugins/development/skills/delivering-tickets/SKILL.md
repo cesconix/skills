@@ -15,7 +15,7 @@ description: >
 compatibility: Requires Claude Code with MCP tools for Atlassian (Jira/Confluence), Slack, Teams, and Playwright configured.
 metadata:
   author: Francesco Pasqua
-  version: 1.1.0
+  version: 1.2.0
   mcp-servers: atlassian, slack, teams, playwright
 ---
 
@@ -32,6 +32,28 @@ The pattern is: spot the doubt → match it to the right contact → propose the
 Example: "The ticket doesn't specify what to do when the user has no active subscription. This is a requirements doubt — I suggest asking Marco Bianchi (PM) on Teams: 'For ALPHA-342, what should happen if the user has no active subscription? Do we show an error or redirect to the pricing page?' Shall I proceed?"
 
 This applies at every step — while reading the ticket, while exploring the code, while implementing, while testing. Don't accumulate doubts silently. Surface them as soon as they appear.
+
+### Resuming Interrupted Work
+
+If the user asks you to resume or continue a task from a previous session, reconstruct state before doing anything:
+
+1. **Check the board** — fetch the ticket via MCP. Its status tells you where things were left (To Do, In Progress, In Review)
+2. **Check git** — look for a branch matching the project's branching convention (e.g., `feat/{ticket-id}-*`). If it exists, read the diff against the base branch to understand what was already done
+3. **Check open PRs** — search for a PR linked to the ticket. If one exists, the task may already be in review
+4. **Check pending messages** — run `/delivering-tickets:check` to see if there are unanswered questions from a previous session
+
+Based on what you find, jump to the right step — don't restart from scratch. Tell the user what you found and where you're picking up from.
+
+### When a Task Can't Be Completed
+
+Not every task ends with a PR. If at any point you determine the task is blocked, out of scope, or not feasible, exit gracefully:
+
+1. **Explain why** — be specific about what's blocking you (missing dependency, conflicting requirements, external blocker, insufficient permissions)
+2. **Update the board** — move the ticket back to the appropriate status (e.g., "To Do" or "Blocked") and add a comment explaining the situation and what needs to happen before the task can proceed
+3. **Notify** — if notifications are configured, send a message to the team channel explaining the blocker
+4. **Propose next steps** — suggest who to contact, what to unblock, or whether the ticket should be re-scoped
+
+Don't silently abandon a task. Even a failed attempt produces useful information — capture it on the ticket so the next person doesn't start from zero.
 
 ## Step 0: Load the Project
 
@@ -93,78 +115,7 @@ Every time you start working on a project, run a quick health check **before mov
 9. **Tribal knowledge** — how many items are loaded (don't dump them, just the count — they'll be consulted in Step 3)
 10. **Documentation** — how many sources are configured
 
-Then output a compact status block. No box-drawing borders (emojis have variable width in terminals and break alignment). Use indentation, blank lines as separators, and emoji status indicators at the **start** of each checkable line:
-
-```
-# project-alpha
-
-  Board             jira / ALPHA
-  Versioning        github · feat/ALPHA-{n} · conventional
-  Notifications     slack / #alpha-dev
-  Testing           1 cmd (pnpm build) · integration: on
-  Docs              1 source (Confluence ALPHA)
-  Tribal knowledge  0 items
-
-  Repos
-  ✅ alpha-web                     ~/workspace/alpha/alpha-web                   (feat/ALPHA-102)
-  ✅ alpha-config                  ~/workspace/alpha/alpha-config                (main)
-  ✅ alpha-integration             ~/workspace/alpha/alpha-integration           (main)
-
-  MCP
-  ✅ atlassian                     (board, docs)
-  ✅ slack                         (notifications)
-  ✅ github                        (versioning)
-  ✅ playwright                    (integration testing)
-
-  Contacts
-  · Alice Smith       tech_lead      slack — architecture, infra, deploy, technical details
-  · Bob Johnson       pm_technical   slack — requirements, client comms, Jira tickets, scope
-```
-
-When something is down or missing, use ❌ on the affected line and add an issues section at the bottom:
-
-```
-# project-alpha
-
-  Board             jira / ALPHA
-  Versioning        github · feat/ALPHA-{n} · conventional
-  Notifications     slack / #alpha-dev
-  Testing           1 cmd (pnpm build) · integration: on
-  Docs              1 source (Confluence ALPHA)
-  Tribal knowledge  0 items
-
-  Repos
-  ✅ alpha-web                     ~/workspace/alpha/alpha-web                   (feat/ALPHA-102)
-  ✅ alpha-config                  ~/workspace/alpha/alpha-config                (main)
-  ❌ alpha-integration             — not cloned
-
-  MCP
-  ✅ atlassian                     (board, docs)
-  ❌ slack                         (notifications)
-  ✅ github                        (versioning)
-  ❌ playwright                    (integration testing)
-
-  Contacts
-  · Alice Smith       tech_lead      slack — architecture, infra, deploy, technical details
-  · Bob Johnson       pm_technical   slack — requirements, client comms, Jira tickets, scope
-
-  ⚠️ Issues
-  · slack: not configured — needed for team notifications
-  · playwright: not configured — needed for browser-based integration tests
-  · alpha-integration: `git clone git@github.com:org/alpha-integration.git ~/workspace/alpha/alpha-integration`
-```
-
-**Rules:**
-- No box-drawing borders — emojis break alignment in terminals. Use `#` header, indentation, and blank lines for structure
-- Emojis only as status prefixes: ✅ = OK, ❌ = failed, ⚠️ = warning section header. Place them at the **start** of the line
-- Use `·` as bullet for non-checkable items (contacts, issues list)
-- Config section (board, versioning, etc.) has no status prefix — it's informational
-- Repos section: show the full local path so the user can verify it at a glance
-- Keep the output compact — no prose, no explanations outside the block
-- Show everything the project file defines so the user sees what was recognized at a glance
-- If everything is green, move on immediately to Step 1
-- If anything is red, show the `⚠️ Issues` section with a one-line fix per issue, then ask the user if they want help fixing it or want to proceed anyway
-- This replaces the need to run `/delivering-tickets:setup` manually in most cases — setup is still available for a more thorough check
+Then output a compact status block. See `references/health-check-format.md` for the exact format, examples, and rules.
 
 ## Step 1: Get the Task
 
@@ -203,11 +154,9 @@ Then check your knowledge level:
 | Complex | High | Pause. Share your plan, implement, ask for review before opening PR. Propose involving the tech lead or relevant contact for review. |
 | Complex | Low | Stop. Propose specific questions to specific contacts before even planning. |
 
-**In every case**, if you find ambiguities or open questions, proactively suggest who from `contacts` can clarify them. Don't just say "I have doubts" — say "I suggest asking [name] ([role]) on [channel]: '[specific question]'. Shall I proceed?"
-
 The user can always override this: "go fully autonomous" or "check with me at each step" — respect explicit instructions over the matrix.
 
-> **Before proceeding:** ✓ complexity assessed (simple/medium/complex) ✓ knowledge level determined (high/low) ✓ autonomy decision made per matrix ✓ any doubts surfaced and proposed to contacts
+> **Before proceeding:** ✓ complexity assessed (simple/medium/complex) ✓ knowledge level determined (high/low) ✓ autonomy decision made per matrix ✓ any doubts surfaced (see "Be Proactive About Doubts" above)
 
 ## Step 3: Explore and Understand
 
@@ -219,7 +168,7 @@ Before planning, build context:
 
 3. **Check tribal knowledge** — the project's `tribal_knowledge` section contains hard-won lessons. Read it. Every item is there because someone got burned.
 
-4. **Surface doubts proactively** — don't wait until you're stuck. If anything is unclear, ambiguous, or has multiple valid interpretations, propose reaching out to the right contact immediately. Match the doubt to the contact's `ask_about` topics and suggest a specific question. Even small doubts are worth surfacing — it's better to ask early than to build on wrong assumptions.
+4. **Surface doubts** — if anything is unclear, follow the "Be Proactive About Doubts" protocol above.
 
 > **Before proceeding:** ✓ relevant documentation read ✓ codebase area explored and patterns understood ✓ tribal knowledge reviewed ✓ all doubts surfaced — none left unaddressed
 
@@ -275,35 +224,38 @@ If tests fail, fix them. If you can't fix them and they're not related to your c
 
 ## Step 6: Final Quality Checklist
 
-Before delivering, run through every item in this checklist. This is not optional — each item must be explicitly verified. For each item, do one of three things:
+Before delivering, run through the checklist. The depth scales with the task complexity you assessed in Step 2 — a typo fix doesn't need the same rigor as an architecture change.
 
-1. **Pass** — you verified it and it's good
-2. **Ask for help** — you can't resolve it alone, so ask the user how to fix it
-3. **Ask to skip** — the item doesn't apply or can't be checked, so ask the user for permission to skip it (explain why)
-
-Never silently skip an item. Never assume an item is fine without checking.
+For each item: **pass** (verified and good), **fail** (needs fixing or user input), or **skip** (doesn't apply — explain why). Never silently skip an item.
 
 ### The Checklist
 
-| # | Check | How to Verify |
-|---|-------|---------------|
-| 1 | **Acceptance criteria met** | Re-read every acceptance criterion from the ticket. For each one, confirm your implementation satisfies it. If any criterion is ambiguous, ask the user. |
-| 2 | **Tests pass** | Run the full test suite (`testing.commands` from project). Zero failures. |
-| 3 | **Linting and type-checking pass** | Run all configured linters and type-checkers. Zero errors. |
-| 4 | **No unrelated changes** | Review your diff — every changed file must be justified by the task. Revert anything that crept in (formatting changes, unrelated refactors). |
-| 5 | **No secrets or credentials committed** | Scan staged files for API keys, passwords, tokens, `.env` values. Nothing sensitive goes into the commit. |
-| 6 | **Commit messages follow conventions** | Check the project's commit convention (from project file or CLAUDE.md). Every commit must follow it. |
-| 7 | **Branch name follows convention** | Verify the branch name matches the project's branching convention (e.g., `feat/{ticket-id}-{short-desc}`). |
-| 8 | **Documentation updated** | If your change affects public APIs, configuration, or user-facing behavior, check whether docs need updating. If they do and you haven't updated them, do it now. |
-| 9 | **PR description is complete** | The PR must link the ticket, describe what changed and why, and list anything reviewers should pay attention to. |
-| 10 | **Integration tests pass** (if applicable) | If `testing.integration.enabled` is true, confirm the integration/smoke tests from Step 5 passed. |
+| # | Check | How to Verify | Tier |
+|---|-------|---------------|------|
+| 1 | **Acceptance criteria met** | Re-read every criterion from the ticket and confirm your implementation satisfies it. | All |
+| 2 | **Tests pass** | Run the full test suite (`testing.commands` from project). Zero failures. | All |
+| 3 | **Linting and type-checking pass** | Run all configured linters and type-checkers. Zero errors. | All |
+| 4 | **No unrelated changes** | Review your diff — every changed file must be justified by the task. Revert anything that crept in. | Medium+ |
+| 5 | **No secrets or credentials committed** | Scan staged files for API keys, passwords, tokens, `.env` values. | All |
+| 6 | **Commit messages follow conventions** | Check the project's commit convention (from project file or CLAUDE.md). | All |
+| 7 | **Branch name follows convention** | Verify the branch name matches the project's branching convention. | All |
+| 8 | **Documentation updated** | If your change affects public APIs, configuration, or user-facing behavior, update docs. | Complex |
+| 9 | **PR description is complete** | The PR must link the ticket, describe what changed and why, and note anything for reviewers. | Medium+ |
+| 10 | **Integration tests pass** | If `testing.integration.enabled` is true, confirm integration/smoke tests from Step 5 passed. | Complex |
+
+**Tier meaning:**
+- **All** — always check, regardless of complexity
+- **Medium+** — check for medium and complex tasks; auto-skip for simple tasks
+- **Complex** — check only for complex tasks; auto-skip for simple and medium tasks
+
+For auto-skipped items, no need to ask the user — just mark them ⏭️ in the summary with the reason.
 
 ### Presenting Results
 
-After running through all 10 items, present a summary to the user:
+After running through the checklist, present a compact summary:
 
 ```
-Final quality checklist:
+Final quality checklist (medium task):
  1. Acceptance criteria met       ✅
  2. Tests pass                    ✅
  3. Linting/type-check pass       ✅
@@ -311,14 +263,14 @@ Final quality checklist:
  5. No secrets committed          ✅
  6. Commit messages OK            ✅
  7. Branch name OK                ✅
- 8. Documentation updated         ⏭️ skipped (no public API changes)
+ 8. Documentation updated         ⏭️ auto-skipped (complex only)
  9. PR description complete       ✅
-10. Integration tests pass        ⏭️ skipped (not configured)
+10. Integration tests pass        ⏭️ auto-skipped (complex only)
 ```
 
-Use ✅ for passed, ❌ for failed (with explanation), ⏭️ for skipped (with reason, only after user approval).
+Use ✅ for passed, ❌ for failed (with explanation), ⏭️ for skipped (with reason).
 
-**Do not proceed to Step 7 until every item is either ✅ or ⏭️ (user-approved skip).** If any item is ❌, fix it or ask the user how to proceed.
+**Do not proceed to Step 7 until every item is either ✅ or ⏭️.** If any item is ❌, fix it or ask the user how to proceed.
 
 ## Step 7: Deliver and Learn
 
@@ -416,3 +368,29 @@ Actions:
 5. On reply → plan, implement with checkpoints, verify, quality checklist, deliver, learn
 
 Result: Complex task handled safely with human input at critical points.
+
+### Example 4: Task can't be completed
+
+User says: "Work on ALPHA-456"
+
+Actions:
+1. Load project → fetch ALPHA-456: "Add SSO login via company SAML provider"
+2. Assess: medium complexity → explore codebase
+3. Discover the auth module depends on a library that doesn't support SAML yet (open issue on their repo, no ETA)
+4. Exit gracefully: move ticket to "Blocked", comment on ALPHA-456 explaining the library dependency and linking the upstream issue, notify on Slack, suggest re-scoping to use a different library or waiting for the upstream fix
+
+Result: Task blocked cleanly — the ticket has full context for whoever picks it up next.
+
+### Example 5: Resuming from a previous session
+
+User says: "Continue working on ALPHA-342"
+
+Actions:
+1. Load project → fetch ALPHA-342 (status: "In Progress")
+2. Check git → find branch `feat/ALPHA-342-subscription-billing` with 3 commits ahead of `develop`
+3. Read the diff → implementation is ~70% done (endpoint exists, tests are missing)
+4. No open PRs, no pending messages
+5. Tell the user: "Found your branch with the endpoint already implemented. Tests and integration are still missing. Picking up from Step 5 (Verify)."
+6. Write tests → verify → quality checklist → deliver
+
+Result: Work resumed without redoing what was already done.
